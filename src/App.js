@@ -3,7 +3,7 @@ import { Volume2, RefreshCw, Play, Pause, Save, Upload } from 'lucide-react';
 
 const CalmComposer = () => {
   // グリッドの設定
-  const [gridSize, setGridSize] = useState({ rows: 13, cols: 16 });
+  const [gridSize] = useState({ rows: 13, cols: 16 });
   const [grid, setGrid] = useState([]);
   const [selectedInstrument, setSelectedInstrument] = useState('synth');
   const [volume, setVolume] = useState(0.5);
@@ -86,7 +86,7 @@ const CalmComposer = () => {
         audioContextRef.current.close();
       }
     };
-  }, []);
+  }, [gridSize]); // Added gridSize as dependency
   
   // グローバルなマウスイベントの設定
   useEffect(() => {
@@ -102,7 +102,7 @@ const CalmComposer = () => {
       window.removeEventListener('mouseup', handleGlobalMouseUp);
       window.removeEventListener('mouseleave', handleGlobalMouseUp);
     };
-  }, []);
+  }, []); // Empty dependency array is correct here as it only runs once
   
   // 再生機能の管理
   useEffect(() => {
@@ -136,7 +136,7 @@ const CalmComposer = () => {
         clearInterval(playbackRef.current);
       }
     }
-  }, [isPlaying, grid, playbackSpeed]);
+  }, [isPlaying, grid, playbackSpeed, gridSize, currentColumn]); // Added missing dependencies
   
   // マウスダウンの処理
   const handleMouseDown = (row, col) => {
@@ -190,7 +190,6 @@ const CalmComposer = () => {
     const gainNode = audioContextRef.current.createGain();
     
     // 楽器タイプに基づいた設定
-    let instrumentSettings;
     switch (selectedInstrument) {
       case 'bell':
         oscillator.type = 'triangle';
@@ -279,12 +278,6 @@ const CalmComposer = () => {
       audioContextRef.current.resume();
     }
     setIsPlaying(!isPlaying);
-  };
-  
-  // 再生を停止し、先頭に戻る
-  const stopPlayback = () => {
-    setIsPlaying(false);
-    setCurrentColumn(-1);
   };
   
   // 背景パターンの変更
