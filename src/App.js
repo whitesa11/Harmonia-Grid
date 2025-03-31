@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Volume2, RefreshCw, Play, Pause, Save, Upload } from 'lucide-react';
 
 const CalmComposer = () => {
@@ -70,6 +70,64 @@ const CalmComposer = () => {
   
   const [currentPattern, setCurrentPattern] = useState(backgroundPatterns[0]);
   
+  // 音を鳴らす関数 - useCallbackでメモ化して依存関係の問題を解決
+  const playNote = useCallback((row, time) => {
+    if (!audioContextRef.current) return;
+    
+    // timeが指定されていない場合、現在時刻を使用
+    const currentTime = time || audioContextRef.current.currentTime;
+    
+    const oscillator = audioContextRef.current.createOscillator();
+    const gainNode = audioContextRef.current.createGain();
+    
+    // 楽器タイプに基づいた設定
+    switch (selectedInstrument) {
+      case 'bell':
+        oscillator.type = 'triangle';
+        // ベル風の音にするためのエンベロープ設定
+        gainNode.gain.setValueAtTime(volume, currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, currentTime + 1.5);
+        break;
+      case 'soft':
+        oscillator.type = 'sine';
+        // ソフトな音にするためのエンベロープ設定
+        gainNode.gain.setValueAtTime(0, currentTime);
+        gainNode.gain.linearRampToValueAtTime(volume * 0.7, currentTime + 0.1);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, currentTime + 2.0);
+        break;
+      case 'warm':
+        oscillator.type = 'sine';
+        // 温かみのある音にするためのエンベロープ設定
+        gainNode.gain.setValueAtTime(0, currentTime);
+        gainNode.gain.linearRampToValueAtTime(volume, currentTime + 0.05);
+        gainNode.gain.exponentialRampToValueAtTime(volume * 0.6, currentTime + 0.2);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, currentTime + 1.8);
+        
+        // 温かみを出すために倍音を追加
+        const harmonicOsc = audioContextRef.current.createOscillator();
+        const harmonicGain = audioContextRef.current.createGain();
+        harmonicOsc.frequency.setValueAtTime(pentatonicScale[row] * 2, currentTime);
+        harmonicGain.gain.setValueAtTime(volume * 0.2, currentTime);
+        harmonicGain.gain.exponentialRampToValueAtTime(0.001, currentTime + 1.5);
+        harmonicOsc.connect(harmonicGain);
+        harmonicGain.connect(audioContextRef.current.destination);
+        harmonicOsc.start(currentTime);
+        harmonicOsc.stop(currentTime + 1.8);
+        break;
+      default: // synth
+        oscillator.type = 'sine';
+        gainNode.gain.setValueAtTime(volume, currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, currentTime + 1.0);
+    }
+    
+    oscillator.frequency.setValueAtTime(pentatonicScale[row], currentTime);
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContextRef.current.destination);
+    
+    oscillator.start(currentTime);
+    oscillator.stop(currentTime + 2.0); // 2秒後に音を止める
+  }, [selectedInstrument, volume, pentatonicScale]);
+  
   // グリッドの初期化
   useEffect(() => {
     // 初期グリッドを作成（すべてのセルをfalseに）
@@ -136,7 +194,7 @@ const CalmComposer = () => {
         clearInterval(playbackRef.current);
       }
     }
-  }, [isPlaying, grid, playbackSpeed, gridSize, currentColumn]); // Added missing dependencies
+  }, [isPlaying, grid, playbackSpeed, gridSize, currentColumn, playNote]); // Added playNote as dependency
   
   // マウスダウンの処理
   const handleMouseDown = (row, col) => {
@@ -180,61 +238,6 @@ const CalmComposer = () => {
     if (isAddMode) {
       playNote(row);
     }
-  };
-  
-  // 音を鳴らす関数
-  const playNote = (row, time = audioContextRef.current.currentTime) => {
-    if (!audioContextRef.current) return;
-    
-    const oscillator = audioContextRef.current.createOscillator();
-    const gainNode = audioContextRef.current.createGain();
-    
-    // 楽器タイプに基づいた設定
-    switch (selectedInstrument) {
-      case 'bell':
-        oscillator.type = 'triangle';
-        // ベル風の音にするためのエンベロープ設定
-        gainNode.gain.setValueAtTime(volume, time);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, time + 1.5);
-        break;
-      case 'soft':
-        oscillator.type = 'sine';
-        // ソフトな音にするためのエンベロープ設定
-        gainNode.gain.setValueAtTime(0, time);
-        gainNode.gain.linearRampToValueAtTime(volume * 0.7, time + 0.1);
-        gainNode.gain.exponentialRampToValueAtTime(0.001, time + 2.0);
-        break;
-      case 'warm':
-        oscillator.type = 'sine';
-        // 温かみのある音にするためのエンベロープ設定
-        gainNode.gain.setValueAtTime(0, time);
-        gainNode.gain.linearRampToValueAtTime(volume, time + 0.05);
-        gainNode.gain.exponentialRampToValueAtTime(volume * 0.6, time + 0.2);
-        gainNode.gain.exponentialRampToValueAtTime(0.001, time + 1.8);
-        
-        // 温かみを出すために倍音を追加
-        const harmonicOsc = audioContextRef.current.createOscillator();
-        const harmonicGain = audioContextRef.current.createGain();
-        harmonicOsc.frequency.setValueAtTime(pentatonicScale[row] * 2, time);
-        harmonicGain.gain.setValueAtTime(volume * 0.2, time);
-        harmonicGain.gain.exponentialRampToValueAtTime(0.001, time + 1.5);
-        harmonicOsc.connect(harmonicGain);
-        harmonicGain.connect(audioContextRef.current.destination);
-        harmonicOsc.start(time);
-        harmonicOsc.stop(time + 1.8);
-        break;
-      default: // synth
-        oscillator.type = 'sine';
-        gainNode.gain.setValueAtTime(volume, time);
-        gainNode.gain.exponentialRampToValueAtTime(0.001, time + 1.0);
-    }
-    
-    oscillator.frequency.setValueAtTime(pentatonicScale[row], time);
-    oscillator.connect(gainNode);
-    gainNode.connect(audioContextRef.current.destination);
-    
-    oscillator.start(time);
-    oscillator.stop(time + 2.0); // 2秒後に音を止める
   };
   
   // グリッドをクリア
