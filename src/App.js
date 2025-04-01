@@ -22,19 +22,6 @@ const CalmComposer = () => {
   // 音楽再生用の参照
   const audioContextRef = useRef(null);
   
-  // モバイル向けの追加スタイル
-  const touchStyles = {
-    gridContainer: {
-      touchAction: 'none',
-      WebkitTouchCallout: 'none',
-      WebkitUserSelect: 'none',
-      KhtmlUserSelect: 'none',
-      MozUserSelect: 'none',
-      msUserSelect: 'none',
-      userSelect: 'none',
-    }
-  };
-  
   // スケールの設定（ペンタトニックスケール - リラクゼーション向き）
   const pentatonicScale = [
     523.25, // C5
@@ -82,29 +69,6 @@ const CalmComposer = () => {
   ];
   
   const [currentPattern, setCurrentPattern] = useState(backgroundPatterns[0]);
-  
-  // モバイル向けのビューポート設定
-  useEffect(() => {
-    // モバイルデバイスでのピンチズームを防止
-    const metaViewport = document.querySelector('meta[name=viewport]');
-    const originalContent = metaViewport ? metaViewport.content : '';
-    
-    if (metaViewport) {
-      metaViewport.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
-    } else {
-      const meta = document.createElement('meta');
-      meta.name = 'viewport';
-      meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
-      document.head.appendChild(meta);
-    }
-    
-    // クリーンアップ
-    return () => {
-      if (metaViewport && originalContent) {
-        metaViewport.content = originalContent;
-      }
-    };
-  }, []);
   
   // 音を鳴らす関数 - useCallbackでメモ化して依存関係の問題を解決
   const playNote = useCallback((row, time) => {
@@ -180,7 +144,7 @@ const CalmComposer = () => {
         audioContextRef.current.close();
       }
     };
-  }, [gridSize]);
+  }, [gridSize]); // Added gridSize as dependency
   
   // グローバルなマウスイベントの設定
   useEffect(() => {
@@ -192,17 +156,11 @@ const CalmComposer = () => {
     window.addEventListener('mouseup', handleGlobalMouseUp);
     window.addEventListener('mouseleave', handleGlobalMouseUp);
     
-    // タッチイベントの終了時の処理も追加
-    window.addEventListener('touchend', handleGlobalMouseUp);
-    window.addEventListener('touchcancel', handleGlobalMouseUp);
-    
     return () => {
       window.removeEventListener('mouseup', handleGlobalMouseUp);
       window.removeEventListener('mouseleave', handleGlobalMouseUp);
-      window.removeEventListener('touchend', handleGlobalMouseUp);
-      window.removeEventListener('touchcancel', handleGlobalMouseUp);
     };
-  }, []);
+  }, []); // Empty dependency array is correct here as it only runs once
   
   // 再生機能の管理
   useEffect(() => {
@@ -236,7 +194,7 @@ const CalmComposer = () => {
         clearInterval(playbackRef.current);
       }
     }
-  }, [isPlaying, grid, playbackSpeed, gridSize, currentColumn, playNote]);
+  }, [isPlaying, grid, playbackSpeed, gridSize, currentColumn, playNote]); // Added playNote as dependency
   
   // マウスダウンの処理
   const handleMouseDown = (row, col) => {
@@ -279,69 +237,6 @@ const CalmComposer = () => {
     // 追加モードのときのみ音を鳴らす
     if (isAddMode) {
       playNote(row);
-    }
-  };
-  
-  // タッチイベントの処理 - 改善版
-  const handleTouchStart = (e, row, col) => {
-    // ブラウザのデフォルト動作を防止
-    e.preventDefault();
-    e.stopPropagation();
-    
-    // Safariのための対応
-    if (audioContextRef.current.state === 'suspended') {
-      audioContextRef.current.resume();
-    }
-    
-    setIsMouseDown(true);
-    setLastCell({ row, col });
-    
-    // 現在のセルの状態
-    const cellValue = grid[row][col];
-    setIsAddMode(!cellValue);
-    
-    // グリッドを更新
-    const newGrid = [...grid];
-    newGrid[row][col] = !cellValue;
-    setGrid(newGrid);
-    
-    // 音符を追加する場合のみ音を鳴らす
-    if (!cellValue) {
-      playNote(row);
-    }
-  };
-  
-  // タッチムーブの処理 - 改善版
-  const handleTouchMove = (e) => {
-    // ブラウザのデフォルト動作を防止
-    e.preventDefault();
-    e.stopPropagation();
-    
-    if (!isMouseDown) return;
-    
-    // タッチ座標を取得
-    const touch = e.touches[0];
-    const gridElement = e.currentTarget;
-    const rect = gridElement.getBoundingClientRect();
-    
-    // グリッド内の位置を計算
-    const touchX = touch.clientX - rect.left;
-    const touchY = touch.clientY - rect.top;
-    
-    // セルサイズを計算
-    const cellWidth = rect.width / gridSize.cols;
-    const cellHeight = rect.height / gridSize.rows;
-    
-    // タッチしたセルを計算
-    const col = Math.floor(touchX / cellWidth);
-    const row = Math.floor(touchY / cellHeight);
-    
-    // グリッドの範囲内かチェック
-    if (row >= 0 && row < gridSize.rows && col >= 0 && col < gridSize.cols) {
-      // 新しいセルかどうかチェック（重複処理を避ける）
-      if (lastCell.row !== row || lastCell.col !== col) {
-        handleMouseOver(row, col);
-      }
     }
   };
   
@@ -469,6 +364,39 @@ const CalmComposer = () => {
     event.target.value = null;
   };
   
+  // タッチイベントの処理
+  const handleTouchStart = (e, row, col) => {
+    e.preventDefault(); // デフォルトのスクロールを防止
+    handleMouseDown(row, col);
+  };
+  
+  const handleTouchMove = (e) => {
+    e.preventDefault();
+    if (!isMouseDown) return;
+    
+    // タッチイベントから座標を取得
+    const touch = e.touches[0];
+    const gridElement = e.currentTarget;
+    const rect = gridElement.getBoundingClientRect();
+    
+    // タッチ位置からグリッド上の位置を計算
+    const touchX = touch.clientX - rect.left;
+    const touchY = touch.clientY - rect.top;
+    
+    // グリッドのセルサイズ（推定）
+    const cellWidth = rect.width / gridSize.cols;
+    const cellHeight = rect.height / gridSize.rows;
+    
+    // タッチしたセルの計算
+    const col = Math.floor(touchX / cellWidth);
+    const row = Math.floor(touchY / cellHeight);
+    
+    // グリッド範囲内かチェック
+    if (row >= 0 && row < gridSize.rows && col >= 0 && col < gridSize.cols) {
+      handleMouseOver(row, col);
+    }
+  };
+  
   // ファイル選択用の隠しinput
   const fileInputRef = useRef(null);
   
@@ -487,28 +415,20 @@ const CalmComposer = () => {
       <h1 className="text-3xl font-bold text-gray-800 mb-2">Harmonia Grid</h1>
       <p className="text-gray-600 mb-6">リラックスするための音楽パターンを描きましょう</p>
       
-      {/* メインの音楽グリッド - モバイル対応強化版 */}
+      {/* メインの音楽グリッド - レスポンシブ対応 */}
       <div 
-        className={`${colors.gridBackground} rounded-lg shadow-lg p-1 mb-6 overflow-hidden mx-auto`}
+        className={`${colors.gridBackground} rounded-lg shadow-lg p-1 mb-6 overflow-auto mx-auto`}
         style={{ 
           width: 'fit-content', 
-          maxWidth: '100%',
-          touchAction: 'none' // モバイルでのすべてのタッチイベントのブラウザ処理を防止
+          maxWidth: '100%'
         }}
         onTouchMove={handleTouchMove}
-        onTouchStart={(e) => {
-          // スクロールを完全に防止
-          e.preventDefault();
-          e.stopPropagation();
-        }}
       >
-        <div 
-          className="grid-container" 
-          style={touchStyles.gridContainer}
-        >
+        <div className="grid-container">
           {grid.map((row, rowIndex) => (
             <div key={`row-${rowIndex}`} className="flex">
               {row.map((cell, colIndex) => {
+                // サイズをTailwindクラスではなく、スタイルで直接指定
                 return (
                   <div
                     key={`cell-${rowIndex}-${colIndex}`}
@@ -522,7 +442,6 @@ const CalmComposer = () => {
                       width: '30px',
                       height: '30px',
                       minWidth: '30px',
-                      touchAction: 'none' // セル単位でもタッチイベントのブラウザ処理を防止
                     }}
                     onMouseDown={() => handleMouseDown(rowIndex, colIndex)}
                     onMouseOver={() => handleMouseOver(rowIndex, colIndex)}
