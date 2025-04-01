@@ -2,8 +2,11 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Volume2, RefreshCw, Play, Pause, Save, Upload } from 'lucide-react';
 
 const CalmComposer = () => {
-  // グリッドの設定
-  const [gridSize] = useState({ rows: 13, cols: 16 });
+  // レスポンシブ対応のためのウィンドウサイズ検出
+  const [isMobile, setIsMobile] = useState(false);
+  
+  // グリッドの設定 - モバイルの場合は列数を調整
+  const [gridSize, setGridSize] = useState({ rows: 13, cols: 16 });
   const [grid, setGrid] = useState([]);
   const [selectedInstrument, setSelectedInstrument] = useState('synth');
   const [volume, setVolume] = useState(0.5);
@@ -18,6 +21,9 @@ const CalmComposer = () => {
   const [isMouseDown, setIsMouseDown] = useState(false);
   const [isAddMode, setIsAddMode] = useState(true); // マウスダウン時の最初のセルの状態で追加か削除かを決定
   const [lastCell, setLastCell] = useState({ row: -1, col: -1 });
+  
+  // AudioContextの初期化状態
+  const [audioContextInitialized, setAudioContextInitialized] = useState(false);
   
   // 音楽再生用の参照
   const audioContextRef = useRef(null);
@@ -70,63 +76,108 @@ const CalmComposer = () => {
   
   const [currentPattern, setCurrentPattern] = useState(backgroundPatterns[0]);
   
-  // 音を鳴らす関数 - useCallbackでメモ化して依存関係の問題を解決
-  const playNote = useCallback((row, time) => {
-    if (!audioContextRef.current) return;
+  // ウィンドウサイズの監視とモバイル判定
+  useEffect(() => {
+    const checkIsMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
     
-    // timeが指定されていない場合、現在時刻を使用
-    const currentTime = time || audioContextRef.current.currentTime;
+    // 初期チェック
+    checkIsMobile();
     
-    const oscillator = audioContextRef.current.createOscillator();
-    const gainNode = audioContextRef.current.createGain();
+    // リサイズ時にチェック
+    window.addEventListener('resize', checkIsMobile);
     
-    // 楽器タイプに基づいた設定
-    switch (selectedInstrument) {
-      case 'bell':
-        oscillator.type = 'triangle';
-        // ベル風の音にするためのエンベロープ設定
-        gainNode.gain.setValueAtTime(volume, currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, currentTime + 1.5);
-        break;
-      case 'soft':
-        oscillator.type = 'sine';
-        // ソフトな音にするためのエンベロープ設定
-        gainNode.gain.setValueAtTime(0, currentTime);
-        gainNode.gain.linearRampToValueAtTime(volume * 0.7, currentTime + 0.1);
-        gainNode.gain.exponentialRampToValueAtTime(0.001, currentTime + 2.0);
-        break;
-      case 'warm':
-        oscillator.type = 'sine';
-        // 温かみのある音にするためのエンベロープ設定
-        gainNode.gain.setValueAtTime(0, currentTime);
-        gainNode.gain.linearRampToValueAtTime(volume, currentTime + 0.05);
-        gainNode.gain.exponentialRampToValueAtTime(volume * 0.6, currentTime + 0.2);
-        gainNode.gain.exponentialRampToValueAtTime(0.001, currentTime + 1.8);
-        
-        // 温かみを出すために倍音を追加
-        const harmonicOsc = audioContextRef.current.createOscillator();
-        const harmonicGain = audioContextRef.current.createGain();
-        harmonicOsc.frequency.setValueAtTime(pentatonicScale[row] * 2, currentTime);
-        harmonicGain.gain.setValueAtTime(volume * 0.2, currentTime);
-        harmonicGain.gain.exponentialRampToValueAtTime(0.001, currentTime + 1.5);
-        harmonicOsc.connect(harmonicGain);
-        harmonicGain.connect(audioContextRef.current.destination);
-        harmonicOsc.start(currentTime);
-        harmonicOsc.stop(currentTime + 1.8);
-        break;
-      default: // synth
-        oscillator.type = 'sine';
-        gainNode.gain.setValueAtTime(volume, currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.001, currentTime + 1.0);
+    return () => {
+      window.removeEventListener('resize', checkIsMobile);
+    };
+  }, []);
+  
+  // モバイル検出時にグリッドサイズを変更
+  useEffect(() => {
+    if (isMobile) {
+      setGridSize({ rows: 13, cols: 11 }); // モバイルでは11列に変更
+    } else {
+      setGridSize({ rows: 13, cols: 16 }); // デスクトップでは16列
+    }
+  }, [isMobile]);
+  
+  // AudioContextの初期化関数
+  const initializeAudioContext = useCallback(() => {
+    if (!audioContextRef.current) {
+      audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
     }
     
-    oscillator.frequency.setValueAtTime(pentatonicScale[row], currentTime);
-    oscillator.connect(gainNode);
-    gainNode.connect(audioContextRef.current.destination);
+    if (audioContextRef.current.state === 'suspended') {
+      audioContextRef.current.resume().then(() => {
+        setAudioContextInitialized(true);
+      });
+    } else {
+      setAudioContextInitialized(true);
+    }
+  }, []);
+  
+  // 音を鳴らす関数 - useCallbackでメモ化して依存関係の問題を解決
+  const playNote = useCallback((row, time) => {
+    if (!audioContextRef.current || !audioContextInitialized) return;
     
-    oscillator.start(currentTime);
-    oscillator.stop(currentTime + 2.0); // 2秒後に音を止める
-  }, [selectedInstrument, volume, pentatonicScale]);
+    try {
+      // timeが指定されていない場合、現在時刻を使用
+      const currentTime = time || audioContextRef.current.currentTime;
+      
+      const oscillator = audioContextRef.current.createOscillator();
+      const gainNode = audioContextRef.current.createGain();
+      
+      // 楽器タイプに基づいた設定
+      switch (selectedInstrument) {
+        case 'bell':
+          oscillator.type = 'triangle';
+          // ベル風の音にするためのエンベロープ設定
+          gainNode.gain.setValueAtTime(volume, currentTime);
+          gainNode.gain.exponentialRampToValueAtTime(0.01, currentTime + 1.5);
+          break;
+        case 'soft':
+          oscillator.type = 'sine';
+          // ソフトな音にするためのエンベロープ設定
+          gainNode.gain.setValueAtTime(0, currentTime);
+          gainNode.gain.linearRampToValueAtTime(volume * 0.7, currentTime + 0.1);
+          gainNode.gain.exponentialRampToValueAtTime(0.001, currentTime + 2.0);
+          break;
+        case 'warm':
+          oscillator.type = 'sine';
+          // 温かみのある音にするためのエンベロープ設定
+          gainNode.gain.setValueAtTime(0, currentTime);
+          gainNode.gain.linearRampToValueAtTime(volume, currentTime + 0.05);
+          gainNode.gain.exponentialRampToValueAtTime(volume * 0.6, currentTime + 0.2);
+          gainNode.gain.exponentialRampToValueAtTime(0.001, currentTime + 1.8);
+          
+          // 温かみを出すために倍音を追加
+          const harmonicOsc = audioContextRef.current.createOscillator();
+          const harmonicGain = audioContextRef.current.createGain();
+          harmonicOsc.frequency.setValueAtTime(pentatonicScale[row] * 2, currentTime);
+          harmonicGain.gain.setValueAtTime(volume * 0.2, currentTime);
+          harmonicGain.gain.exponentialRampToValueAtTime(0.001, currentTime + 1.5);
+          harmonicOsc.connect(harmonicGain);
+          harmonicGain.connect(audioContextRef.current.destination);
+          harmonicOsc.start(currentTime);
+          harmonicOsc.stop(currentTime + 1.8);
+          break;
+        default: // synth
+          oscillator.type = 'sine';
+          gainNode.gain.setValueAtTime(volume, currentTime);
+          gainNode.gain.exponentialRampToValueAtTime(0.001, currentTime + 1.0);
+      }
+      
+      oscillator.frequency.setValueAtTime(pentatonicScale[row], currentTime);
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContextRef.current.destination);
+      
+      oscillator.start(currentTime);
+      oscillator.stop(currentTime + 2.0); // 2秒後に音を止める
+    } catch (error) {
+      console.error('音声再生エラー:', error);
+    }
+  }, [selectedInstrument, volume, pentatonicScale, audioContextInitialized]);
   
   // グリッドの初期化
   useEffect(() => {
@@ -135,16 +186,14 @@ const CalmComposer = () => {
       .map(() => Array(gridSize.cols).fill(false));
     setGrid(newGrid);
     
-    // Web Audio APIのセットアップ
-    audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
-    
+    // AudioContextは初期化しない - ユーザーアクションを待つ
     return () => {
       // クリーンアップ
       if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
         audioContextRef.current.close();
       }
     };
-  }, [gridSize]); // Added gridSize as dependency
+  }, [gridSize]); // グリッドサイズが変わったら再初期化
   
   // グローバルなマウスイベントの設定
   useEffect(() => {
@@ -160,11 +209,16 @@ const CalmComposer = () => {
       window.removeEventListener('mouseup', handleGlobalMouseUp);
       window.removeEventListener('mouseleave', handleGlobalMouseUp);
     };
-  }, []); // Empty dependency array is correct here as it only runs once
+  }, []);
   
   // 再生機能の管理
   useEffect(() => {
     if (isPlaying) {
+      // 再生開始前にAudioContextが初期化されていることを確認
+      if (!audioContextInitialized) {
+        initializeAudioContext();
+      }
+      
       // 再生開始
       let column = currentColumn < 0 ? 0 : currentColumn;
       
@@ -194,13 +248,13 @@ const CalmComposer = () => {
         clearInterval(playbackRef.current);
       }
     }
-  }, [isPlaying, grid, playbackSpeed, gridSize, currentColumn, playNote]); // Added playNote as dependency
+  }, [isPlaying, grid, playbackSpeed, gridSize, currentColumn, playNote, audioContextInitialized, initializeAudioContext]);
   
   // マウスダウンの処理
   const handleMouseDown = (row, col) => {
-    // Safariのための対応
-    if (audioContextRef.current.state === 'suspended') {
-      audioContextRef.current.resume();
+    // AudioContextの初期化 - ユーザーインタラクション時に実行
+    if (!audioContextInitialized) {
+      initializeAudioContext();
     }
     
     setIsMouseDown(true);
@@ -216,7 +270,7 @@ const CalmComposer = () => {
     setGrid(newGrid);
     
     // 追加モードのときのみ音を鳴らす
-    if (!cellValue) {
+    if (!cellValue && audioContextInitialized) {
       playNote(row);
     }
   };
@@ -235,7 +289,7 @@ const CalmComposer = () => {
     setGrid(newGrid);
     
     // 追加モードのときのみ音を鳴らす
-    if (isAddMode) {
+    if (isAddMode && audioContextInitialized) {
       playNote(row);
     }
   };
@@ -277,8 +331,9 @@ const CalmComposer = () => {
   
   // 再生/停止の切り替え
   const togglePlayback = () => {
-    if (audioContextRef.current.state === 'suspended') {
-      audioContextRef.current.resume();
+    // 再生時にAudioContextを初期化
+    if (!audioContextInitialized) {
+      initializeAudioContext();
     }
     setIsPlaying(!isPlaying);
   };
@@ -364,19 +419,40 @@ const CalmComposer = () => {
     event.target.value = null;
   };
   
-  // タッチイベントの処理
+  // タッチイベントの処理を改善
   const handleTouchStart = (e, row, col) => {
-    e.preventDefault(); // デフォルトのスクロールを防止
-    handleMouseDown(row, col);
+    // AudioContextの初期化 - ユーザーインタラクション時に実行
+    if (!audioContextInitialized) {
+      initializeAudioContext();
+    }
+    
+    setIsMouseDown(true);
+    setLastCell({ row, col });
+    
+    // 現在のセルの状態を取得
+    const cellValue = grid[row][col];
+    setIsAddMode(!cellValue);
+    
+    // セルの状態を更新
+    const newGrid = [...grid];
+    newGrid[row][col] = !cellValue;
+    setGrid(newGrid);
+    
+    // 追加モードのときのみ音を鳴らす
+    if (!cellValue && audioContextInitialized) {
+      playNote(row);
+    }
   };
   
+  // タッチムーブの処理を改善（パッシブイベントリスナーの問題を解決）
   const handleTouchMove = (e) => {
-    e.preventDefault();
     if (!isMouseDown) return;
     
     // タッチイベントから座標を取得
     const touch = e.touches[0];
-    const gridElement = e.currentTarget;
+    const gridElement = document.querySelector('.grid-container');
+    if (!gridElement) return;
+    
     const rect = gridElement.getBoundingClientRect();
     
     // タッチ位置からグリッド上の位置を計算
@@ -407,6 +483,38 @@ const CalmComposer = () => {
     }
   };
   
+  // グリッドコンテナにタッチイベントを追加
+  useEffect(() => {
+    const gridContainer = document.querySelector('.grid-container');
+    if (!gridContainer) return;
+    
+    const touchMoveHandler = (e) => {
+      handleTouchMove(e);
+    };
+    
+    gridContainer.addEventListener('touchmove', touchMoveHandler, { passive: true });
+    
+    return () => {
+      gridContainer.removeEventListener('touchmove', touchMoveHandler);
+    };
+  }, [grid, isMouseDown, isAddMode, gridSize, handleTouchMove]);
+  
+  // モバイル用のCSSスタイル
+  const getMobileCellStyle = () => {
+    if (isMobile) {
+      return {
+        width: '28px',
+        height: '28px',
+        minWidth: '28px',
+      };
+    }
+    return {
+      width: '30px',
+      height: '30px',
+      minWidth: '30px',
+    };
+  };
+  
   return (
     <div 
       className={`min-h-screen ${colors.background} flex flex-col items-center py-8 px-4 bg-gradient-to-r ${currentPattern.className}`}
@@ -417,12 +525,11 @@ const CalmComposer = () => {
       
       {/* メインの音楽グリッド - レスポンシブ対応 */}
       <div 
-        className={`${colors.gridBackground} rounded-lg shadow-lg p-1 mb-6 overflow-auto mx-auto`}
+        className={`${colors.gridBackground} rounded-lg shadow-lg p-1 mb-6 mx-auto`}
         style={{ 
           width: 'fit-content', 
           maxWidth: '100%'
         }}
-        onTouchMove={handleTouchMove}
       >
         <div className="grid-container">
           {grid.map((row, rowIndex) => (
@@ -438,11 +545,7 @@ const CalmComposer = () => {
                       ${colIndex === currentColumn ? colors.playbackIndicator : ''}
                       ${rowIndex % 2 === 0 ? 'opacity-90' : 'opacity-100'}
                     `}
-                    style={{
-                      width: '30px',
-                      height: '30px',
-                      minWidth: '30px',
-                    }}
+                    style={getMobileCellStyle()}
                     onMouseDown={() => handleMouseDown(rowIndex, colIndex)}
                     onMouseOver={() => handleMouseOver(rowIndex, colIndex)}
                     onTouchStart={(e) => handleTouchStart(e, rowIndex, colIndex)}
@@ -600,6 +703,14 @@ const CalmComposer = () => {
         <p className="mt-1 sm:mt-2">リラックスするためのペンタトニックスケールを使用しているので、どの組み合わせも心地よく響きます。</p>
         <p className="mt-1 sm:mt-2">再生ボタンを押すと、左から右へと順番に音が鳴ります。保存ボタンでお気に入りの曲を保存することもできます。</p>
       </div>
+      
+      {/* モバイル向けの説明 */}
+      {isMobile && (
+        <div className="mt-4 bg-blue-50 p-3 rounded-lg text-blue-800 text-xs max-w-md mx-auto text-center">
+          <p>モバイルモードでは、見やすさを考慮して11列のグリッドにしています。</p>
+          <p className="mt-1">タッチ操作で音符を配置できます。</p>
+        </div>
+      )}
     </div>
   );
 };
