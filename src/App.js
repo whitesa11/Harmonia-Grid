@@ -680,7 +680,6 @@ const handleMouseOver = useCallback((row, col) => {
         <p className="mt-1 sm:mt-2">再生ボタンを押すと、左から右へと順番に音が鳴ります。保存ボタンでお気に入りの曲を保存することもできます。</p>
       </div>
     </div>
-    </div>
   );
 };
 
