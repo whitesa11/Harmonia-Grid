@@ -3,7 +3,7 @@ import { Volume2, RefreshCw, Play, Pause, Save, Upload } from 'lucide-react';
 
 const CalmComposer = () => {
   // グリッドの設定 - 固定サイズにする
-  const [gridSize, setGridSize] = useState({ rows: 13, cols: 16 });
+  const [gridSize] = useState({ rows: 13, cols: 16 });
   const [grid, setGrid] = useState([]);
   const [selectedInstrument, setSelectedInstrument] = useState('synth');
   const [volume, setVolume] = useState(0.5);
@@ -226,6 +226,7 @@ const CalmComposer = () => {
       if (playbackRef.current) {
         clearInterval(playbackRef.current);
       }
+      return undefined;
     }
   }, [isPlaying, grid, playbackSpeed, gridSize, currentColumn, playNote, audioContextInitialized, initializeAudioContext]);
   
@@ -424,7 +425,7 @@ const CalmComposer = () => {
   };
   
   // タッチムーブの処理を改善（パッシブイベントリスナーの問題を解決）
-  const handleTouchMove = (e) => {
+  const handleTouchMove = useCallback((e) => {
     if (!isMouseDown) return;
     
     // タッチイベントから座標を取得
@@ -450,7 +451,7 @@ const CalmComposer = () => {
     if (row >= 0 && row < gridSize.rows && col >= 0 && col < gridSize.cols) {
       handleMouseOver(row, col);
     }
-  };
+  }, [isMouseDown, gridSize.cols, gridSize.rows, handleMouseOver]);
   
   // ファイル選択用の隠しinput
   const fileInputRef = useRef(null);
@@ -476,7 +477,7 @@ const CalmComposer = () => {
     return () => {
       gridContainer.removeEventListener('touchmove', touchMoveHandler);
     };
-  }, [grid, isMouseDown, isAddMode, gridSize, handleTouchMove]);
+  }, [handleTouchMove]);
   
   // セルのスタイル
   const getCellStyle = () => {
@@ -520,12 +521,13 @@ const CalmComposer = () => {
           {grid.map((row, rowIndex) => (
             <div key={`row-${rowIndex}`} className="flex">
               {row.map((cell, colIndex) => {
+                const instrumentInfo = instruments.find(i => i.id === selectedInstrument);
                 return (
                   <div
                     key={`cell-${rowIndex}-${colIndex}`}
                     className={`
                       border border-gray-100 cursor-pointer transition-all duration-200
-                      ${cell ? instruments.find(i => i.id === selectedInstrument).color : 'bg-gray-50'}
+                      ${cell ? instrumentInfo.color : 'bg-gray-50'}
                       ${colIndex === currentColumn ? colors.playbackIndicator : ''}
                       ${rowIndex % 2 === 0 ? 'opacity-90' : 'opacity-100'}
                     `}
@@ -536,7 +538,7 @@ const CalmComposer = () => {
                   >
                     {cell && 
                       <div 
-                        className={`rounded-full ${instruments.find(i => i.id === selectedInstrument).dotColor} opacity-70 m-auto`}
+                        className={`rounded-full ${instrumentInfo.dotColor} opacity-70 m-auto`}
                         style={{ width: '10px', height: '10px' }}
                       ></div>
                     }
