@@ -165,6 +165,14 @@ const CalmComposer = () => {
       }
     };
   }, [gridSize]); // グリッドサイズが変わったら再初期化
+
+   // 横スクロール防止のためのeffect
+   useEffect(() => {
+    document.body.style.overflowX = 'hidden';
+    return () => {
+      document.body.style.overflowX = '';
+    };
+  }, []);
   
   // グローバルなマウスイベントの設定
   useEffect(() => {
