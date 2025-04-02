@@ -2,10 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Volume2, RefreshCw, Play, Pause, Save, Upload } from 'lucide-react';
 
 const CalmComposer = () => {
-  // レスポンシブ対応のためのウィンドウサイズ検出
-  const [isMobile, setIsMobile] = useState(false);
-  
-  // グリッドの設定 - モバイルの場合は列数を調整
+  // グリッドの設定 - 固定サイズにする
   const [gridSize, setGridSize] = useState({ rows: 13, cols: 16 });
   const [grid, setGrid] = useState([]);
   const [selectedInstrument, setSelectedInstrument] = useState('synth');
@@ -75,32 +72,6 @@ const CalmComposer = () => {
   ];
   
   const [currentPattern, setCurrentPattern] = useState(backgroundPatterns[0]);
-  
-  // ウィンドウサイズの監視とモバイル判定
-  useEffect(() => {
-    const checkIsMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    
-    // 初期チェック
-    checkIsMobile();
-    
-    // リサイズ時にチェック
-    window.addEventListener('resize', checkIsMobile);
-    
-    return () => {
-      window.removeEventListener('resize', checkIsMobile);
-    };
-  }, []);
-  
-  // モバイル検出時にグリッドサイズを変更
-  useEffect(() => {
-    if (isMobile) {
-      setGridSize({ rows: 13, cols: 11 }); // モバイルでは11列に変更
-    } else {
-      setGridSize({ rows: 13, cols: 16 }); // デスクトップでは16列
-    }
-  }, [isMobile]);
   
   // AudioContextの初期化関数
   const initializeAudioContext = useCallback(() => {
@@ -499,15 +470,8 @@ const CalmComposer = () => {
     };
   }, [grid, isMouseDown, isAddMode, gridSize, handleTouchMove]);
   
-  // モバイル用のCSSスタイル
-  const getMobileCellStyle = () => {
-    if (isMobile) {
-      return {
-        width: '28px',
-        height: '28px',
-        minWidth: '28px',
-      };
-    }
+  // セルのスタイル - 固定サイズ
+  const getCellStyle = () => {
     return {
       width: '30px',
       height: '30px',
@@ -523,11 +487,12 @@ const CalmComposer = () => {
       <h1 className="text-3xl font-bold text-gray-800 mb-2">Harmonia Grid</h1>
       <p className="text-gray-600 mb-6">リラックスするための音楽パターンを描きましょう</p>
       
-      {/* メインの音楽グリッド - レスポンシブ対応 */}
+      {/* メインの音楽グリッド */}
       <div 
         className={`${colors.gridBackground} rounded-lg shadow-lg p-1 mb-6 mx-auto`}
         style={{ 
           width: 'fit-content', 
+          overflow: 'hidden',
           maxWidth: '100%'
         }}
       >
@@ -535,7 +500,6 @@ const CalmComposer = () => {
           {grid.map((row, rowIndex) => (
             <div key={`row-${rowIndex}`} className="flex">
               {row.map((cell, colIndex) => {
-                // サイズをTailwindクラスではなく、スタイルで直接指定
                 return (
                   <div
                     key={`cell-${rowIndex}-${colIndex}`}
@@ -545,7 +509,7 @@ const CalmComposer = () => {
                       ${colIndex === currentColumn ? colors.playbackIndicator : ''}
                       ${rowIndex % 2 === 0 ? 'opacity-90' : 'opacity-100'}
                     `}
-                    style={getMobileCellStyle()}
+                    style={getCellStyle()}
                     onMouseDown={() => handleMouseDown(rowIndex, colIndex)}
                     onMouseOver={() => handleMouseOver(rowIndex, colIndex)}
                     onTouchStart={(e) => handleTouchStart(e, rowIndex, colIndex)}
@@ -564,7 +528,7 @@ const CalmComposer = () => {
         </div>
       </div>
       
-      {/* 再生コントロール - レスポンシブ対応 */}
+      {/* 再生コントロール */}
       <div className={`${colors.controls} rounded-lg shadow-md p-3 sm:p-4 w-full max-w-md mx-auto mb-4`}>
         <div className="flex flex-wrap justify-center items-center gap-2 sm:gap-4">
           {/* 再生/停止ボタン */}
@@ -597,7 +561,7 @@ const CalmComposer = () => {
         </div>
       </div>
       
-      {/* コントロールパネル - レスポンシブ対応 */}
+      {/* コントロールパネル */}
       <div className={`${colors.controls} rounded-lg shadow-md p-3 sm:p-4 w-full max-w-md mx-auto`}>
         <div className="flex flex-wrap justify-between items-center gap-2 sm:gap-4">
           {/* 音量コントロール */}
@@ -615,7 +579,7 @@ const CalmComposer = () => {
             <span className="text-xs sm:text-sm">音量</span>
           </div>
           
-          {/* ボタン群をレスポンシブに */}
+          {/* ボタン群 */}
           <div className="flex gap-1 sm:gap-2">
             {/* パターン生成ボタン */}
             <button 
@@ -636,7 +600,7 @@ const CalmComposer = () => {
           </div>
         </div>
         
-        {/* 楽器選択 - レスポンシブ対応 */}
+        {/* 楽器選択 */}
         <div className="mt-3 sm:mt-4">
           <div className="text-xs text-gray-500 mb-1">楽器</div>
           <div className="flex flex-wrap gap-1 sm:gap-2">
@@ -652,7 +616,7 @@ const CalmComposer = () => {
           </div>
         </div>
         
-        {/* 背景パターン選択 - レスポンシブ対応 */}
+        {/* 背景パターン選択 */}
         <div className="mt-3 sm:mt-4">
           <div className="text-xs text-gray-500 mb-1">背景パターン</div>
           <div className="flex flex-wrap gap-1 sm:gap-2">
@@ -668,7 +632,7 @@ const CalmComposer = () => {
           </div>
         </div>
         
-        {/* 保存とロード - レスポンシブ対応 */}
+        {/* 保存とロード */}
         <div className="mt-3 sm:mt-4">
           <div className="text-xs text-gray-500 mb-1">コンポジション</div>
           <div className="flex flex-wrap gap-1 sm:gap-2">
@@ -697,20 +661,12 @@ const CalmComposer = () => {
         </div>
       </div>
       
-      {/* 使い方ガイド - レスポンシブ対応 */}
+      {/* 使い方ガイド */}
       <div className="mt-6 sm:mt-8 text-gray-600 text-xs sm:text-sm max-w-md mx-auto text-center px-2">
         <p>マス目をクリック＆ドラッグで音符を配置できます。音符を置くと同時に音が鳴ります。</p>
         <p className="mt-1 sm:mt-2">リラックスするためのペンタトニックスケールを使用しているので、どの組み合わせも心地よく響きます。</p>
         <p className="mt-1 sm:mt-2">再生ボタンを押すと、左から右へと順番に音が鳴ります。保存ボタンでお気に入りの曲を保存することもできます。</p>
       </div>
-      
-      {/* モバイル向けの説明 */}
-      {isMobile && (
-        <div className="mt-4 bg-blue-50 p-3 rounded-lg text-blue-800 text-xs max-w-md mx-auto text-center">
-          <p>モバイルモードでは、見やすさを考慮して11列のグリッドにしています。</p>
-          <p className="mt-1">タッチ操作で音符を配置できます。</p>
-        </div>
-      )}
     </div>
   );
 };
