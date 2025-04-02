@@ -594,7 +594,6 @@ const loadComposition = (event) => {
   }, [windowWidth]); // windowWidthが変わったときだけ再計算
   
   return (
-
     <div 
       className={`min-h-screen ${colors.background} flex flex-col items-center py-8 px-4 bg-gradient-to-r ${currentPattern.className}`}
       onMouseLeave={() => setIsMouseDown(false)}
