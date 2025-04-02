@@ -227,24 +227,6 @@ useEffect(() => {
     };
   }, [gridSize.cols, grid, isPlaying, currentColumn]);
   
-    // セルのスタイル関数を更新して、レスポンシブ対応にする
-  const getCellStyle = useCallback(() => {
-    // 画面サイズに応じてセルサイズを調整
-    let cellSize;
-    if (windowWidth < 375) {
-      cellSize = '25px'; // 小さいスマートフォン
-    } else if (windowWidth < 640) {
-      cellSize = '28px'; // 通常のスマートフォン
-    } else {
-      cellSize = '30px'; // タブレット以上
-  }
-  
-  return {
-    width: cellSize,
-    height: cellSize,
-    minWidth: cellSize,
-  };
-}, [windowWidth]); // windowWidthが変わったときだけ再計算
 
   // グリッドの初期化
   useEffect(() => {
@@ -591,6 +573,25 @@ const loadComposition = (event) => {
       gridContainer.removeEventListener('touchmove', touchMoveHandler);
     };
   }, [handleTouchMove]);
+
+    // セルのスタイル関数を更新して、レスポンシブ対応にする
+    const getCellStyle = useCallback(() => {
+      // 画面サイズに応じてセルサイズを調整
+      let cellSize;
+      if (windowWidth < 375) {
+        cellSize = '25px'; // 小さいスマートフォン
+      } else if (windowWidth < 640) {
+        cellSize = '28px'; // 通常のスマートフォン
+      } else {
+        cellSize = '30px'; // タブレット以上
+    }
+    
+    return {
+      width: cellSize,
+      height: cellSize,
+      minWidth: cellSize,
+    };
+  }, [windowWidth]); // windowWidthが変わったときだけ再計算
   
   return (
 
