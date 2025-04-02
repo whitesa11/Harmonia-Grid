@@ -490,19 +490,9 @@ const handleMouseOver = useCallback((row, col) => {
   };
   
   return (
-    <div 
-      style={{ 
-      position: 'fixed',
-      left: 0,
-      bottom: 0,
-      }}
-    > 
+
     <div 
       className={`min-h-screen ${colors.background} flex flex-col items-center py-8 px-4 bg-gradient-to-r ${currentPattern.className}`}
-      style={{ 
-        height: '100%',
-        overflowY: 'auto' // 必要な場合のみ縦スクロールを許可
-      }}
       onMouseLeave={() => setIsMouseDown(false)}
     >
       <h1 className="text-3xl font-bold text-gray-800 mb-2">Harmonia Grid</h1>
