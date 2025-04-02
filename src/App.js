@@ -2,8 +2,11 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Volume2, RefreshCw, Play, Pause, Save, Upload } from 'lucide-react';
 
 const CalmComposer = () => {
+  // ウィンドウサイズの状態管理
+  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
+
   // グリッドの設定 - 固定サイズにする
-  const [gridSize] = useState({ rows: 13, cols: 16 });
+  const [gridSize, setGridSize] = useState({ rows: 13, cols: 16 });
   const [grid, setGrid] = useState([]);
   const [selectedInstrument, setSelectedInstrument] = useState('synth');
   const [volume, setVolume] = useState(0.5);
@@ -153,13 +156,104 @@ const CalmComposer = () => {
       console.error('音声再生エラー:', error);
     }
   }, [selectedInstrument, volume, pentatonicScale, audioContextInitialized]);
+
+// ウィンドウサイズを監視するuseEffect
+useEffect(() => {
+  const handleResize = () => {
+    setWindowWidth(window.innerWidth);
+  };
   
+  // 初期値を設定
+  handleResize();
+  
+  // イベントリスナーを追加
+  window.addEventListener('resize', handleResize);
+  
+  // クリーンアップ
+  return () => {
+    window.removeEventListener('resize', handleResize);
+  };
+}, []);
+
+  
+  useEffect(() => {
+    // 画面サイズに基づいてグリッドの列数を調整する関数
+    const adjustGridSize = () => {
+      const width = window.innerWidth;
+      
+      let cols;
+      // 画面サイズに応じて列数を決定
+      if (width < 375) {
+        cols = 8; // 小さいスマートフォン
+      } else if (width < 640) {
+        cols = 10; // 通常のスマートフォン
+      } else if (width < 768) {
+        cols = 12; // 大きめのスマートフォン
+      } else {
+        cols = 16; // タブレット以上
+      }
+      
+      // 列数が変わった場合のみ更新
+      if (cols !== gridSize.cols) {
+        // 既存のグリッドデータを保持しながら、新しいグリッドサイズに調整する
+        const newGrid = Array(gridSize.rows).fill()
+          .map((_, rowIndex) => {
+            if (!grid[rowIndex]) return Array(cols).fill(false);
+            // 既存のデータを新しいサイズにコピー（範囲内のみ）
+            return Array(cols).fill(false).map((_, colIndex) => {
+              return colIndex < grid[rowIndex].length ? grid[rowIndex][colIndex] : false;
+            });
+          });
+        
+        setGrid(newGrid);
+        setGridSize(prev => ({ ...prev, cols }));
+        
+        // 再生中の場合、現在のカラムを調整
+        if (isPlaying && currentColumn >= cols) {
+          setCurrentColumn(0);
+        }
+      }
+    };
+    
+    // 初期調整
+    adjustGridSize();
+    
+    // リサイズイベントリスナーの追加
+    window.addEventListener('resize', adjustGridSize);
+    
+    // クリーンアップ
+    return () => {
+      window.removeEventListener('resize', adjustGridSize);
+    };
+  }, [gridSize.cols, grid, isPlaying, currentColumn]);
+  
+    // セルのスタイル関数を更新して、レスポンシブ対応にする
+  const getCellStyle = useCallback(() => {
+    // 画面サイズに応じてセルサイズを調整
+    let cellSize;
+    if (windowWidth < 375) {
+      cellSize = '25px'; // 小さいスマートフォン
+    } else if (windowWidth < 640) {
+      cellSize = '28px'; // 通常のスマートフォン
+    } else {
+      cellSize = '30px'; // タブレット以上
+  }
+  
+  return {
+    width: cellSize,
+    height: cellSize,
+    minWidth: cellSize,
+  };
+}, [windowWidth]); // windowWidthが変わったときだけ再計算
+
   // グリッドの初期化
   useEffect(() => {
-    // 初期グリッドを作成（すべてのセルをfalseに）
-    const newGrid = Array(gridSize.rows).fill()
-      .map(() => Array(gridSize.cols).fill(false));
-    setGrid(newGrid);
+    // 新しいグリッドが設定されていない場合のみ初期グリッドを作成
+    if (grid.length === 0) {
+      const newGrid = Array(gridSize.rows).fill()
+        .map(() => Array(gridSize.cols).fill(false));
+      setGrid(newGrid);
+    }
     
     // AudioContextは初期化しない - ユーザーアクションを待つ
     return () => {
@@ -168,7 +262,7 @@ const CalmComposer = () => {
         audioContextRef.current.close();
       }
     };
-  }, [gridSize]); // グリッドサイズが変わったら再初期化
+  }, []); // マウント時のみ実行
 
    // 横スクロール防止のためのeffect
    useEffect(() => {
@@ -327,81 +421,96 @@ const handleMouseOver = useCallback((row, col) => {
     setCurrentPattern(pattern);
   };
   
-  // コンポジションの保存
-  const saveComposition = () => {
-    try {
-      // コンポジションデータの作成
-      const compositionData = {
-        grid,
-        instrument: selectedInstrument,
-        background: currentPattern.id,
-        version: '1.1'
-      };
-      
-      // JSON形式で保存
-      const jsonData = JSON.stringify(compositionData);
-      const blob = new Blob([jsonData], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      
-      // ダウンロードリンクの作成と実行
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `calm-composition-${new Date().toISOString().slice(0, 10)}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      
-      alert('コンポジションを保存しました！');
-    } catch (e) {
-      console.error('保存エラー:', e);
-      alert('保存に失敗しました。');
-    }
-  };
-  
-  // コンポジションのロード
-  const loadComposition = (event) => {
-    try {
-      const file = event.target.files[0];
-      if (!file) return;
-      
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        try {
-          const compositionData = JSON.parse(e.target.result);
-          
-          // データの検証
-          if (!compositionData.grid || !compositionData.instrument) {
-            throw new Error('無効なコンポジションデータです');
-          }
-          
-          // データのロード
-          setGrid(compositionData.grid);
-          setSelectedInstrument(compositionData.instrument);
-          
-          // 背景設定がある場合はそれも読み込み
-          if (compositionData.background) {
-            const bgPattern = backgroundPatterns.find(p => p.id === compositionData.background);
-            if (bgPattern) {
-              setCurrentPattern(bgPattern);
-            }
-          }
-          
-          alert('コンポジションをロードしました！');
-        } catch (parseError) {
-          console.error('解析エラー:', parseError);
-          alert('無効なコンポジションファイルです。');
-        }
-      };
-      reader.readAsText(file);
-    } catch (e) {
-      console.error('ロードエラー:', e);
-      alert('読み込みに失敗しました。');
-    }
+ // コンポジションの保存機能を更新
+const saveComposition = () => {
+  try {
+    // コンポジションデータの作成
+    const compositionData = {
+      grid,
+      gridSize: {
+        rows: gridSize.rows,
+        cols: gridSize.cols
+      },
+      instrument: selectedInstrument,
+      background: currentPattern.id,
+      version: '1.2' // バージョン更新
+    };
     
-    // input要素の値をリセット（同じファイルを連続で選択できるように）
-    event.target.value = null;
-  };
+    // JSON形式で保存
+    const jsonData = JSON.stringify(compositionData);
+    const blob = new Blob([jsonData], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    
+    // ダウンロードリンクの作成と実行
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `calm-composition-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    alert('コンポジションを保存しました！');
+  } catch (e) {
+    console.error('保存エラー:', e);
+    alert('保存に失敗しました。');
+  }
+};
+
+// コンポジションのロード機能を更新
+const loadComposition = (event) => {
+  try {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const compositionData = JSON.parse(e.target.result);
+        
+        // データの検証
+        if (!compositionData.grid || !compositionData.instrument) {
+          throw new Error('無効なコンポジションデータです');
+        }
+        
+        // グリッドサイズの読み込み（データに含まれている場合）
+        if (compositionData.gridSize) {
+          setGridSize(compositionData.gridSize);
+        } else {
+          // 旧バージョンとの互換性のため
+          setGridSize({
+            rows: compositionData.grid.length,
+            cols: compositionData.grid[0].length
+          });
+        }
+        
+        // データのロード
+        setGrid(compositionData.grid);
+        setSelectedInstrument(compositionData.instrument);
+        
+        // 背景設定がある場合はそれも読み込み
+        if (compositionData.background) {
+          const bgPattern = backgroundPatterns.find(p => p.id === compositionData.background);
+          if (bgPattern) {
+            setCurrentPattern(bgPattern);
+          }
+        }
+        
+        alert('コンポジションをロードしました！');
+      } catch (parseError) {
+        console.error('解析エラー:', parseError);
+        alert('無効なコンポジションファイルです。');
+      }
+    };
+    reader.readAsText(file);
+  } catch (e) {
+    console.error('ロードエラー:', e);
+    alert('読み込みに失敗しました。');
+  }
+  
+  // input要素の値をリセット（同じファイルを連続で選択できるように）
+  event.target.value = null;
+};
   
   // タッチイベントの処理を改善
   const handleTouchStart = (e, row, col) => {
@@ -482,15 +591,6 @@ const handleMouseOver = useCallback((row, col) => {
       gridContainer.removeEventListener('touchmove', touchMoveHandler);
     };
   }, [handleTouchMove]);
-  
-  // セルのスタイル-固定
-  const getCellStyle = () => {
-    return {
-      width: '30px',
-      height: '30px',
-      minWidth: '30px',
-    };
-  };
   
   return (
 
