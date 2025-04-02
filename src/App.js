@@ -225,7 +225,7 @@ useEffect(() => {
     return () => {
       window.removeEventListener('resize', adjustGridSize);
     };
-  }, [gridSize.cols, grid, isPlaying, currentColumn]);
+  }, [gridSize.cols, gridSize.rows, grid, isPlaying, currentColumn]);
   
 
   // グリッドの初期化
@@ -244,7 +244,7 @@ useEffect(() => {
         audioContextRef.current.close();
       }
     };
-  }, []); // マウント時のみ実行
+  }, [grid.length, gridSize.cols, gridSize.rows]); // マウント時のみ実行
 
    // 横スクロール防止のためのeffect
    useEffect(() => {
