@@ -507,7 +507,7 @@ const handleMouseOver = useCallback((row, col) => {
         style={{ 
           width: '100%', 
           overflow: 'hidden',
-          maxWidth: 'calc(100vw - 32px)'
+          maxWidth: '100%'
         }}
       >
         <div className="grid-container">
