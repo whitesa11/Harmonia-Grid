@@ -470,12 +470,13 @@ const CalmComposer = () => {
     };
   }, [grid, isMouseDown, isAddMode, gridSize, handleTouchMove]);
   
-  // セルのスタイル - 固定サイズ
+  // セルのスタイル
   const getCellStyle = () => {
     return {
-      width: '30px',
-      height: '30px',
-      minWidth: '30px',
+      width: 'calc((100vw - 40px) / 16)',  // 16列に分割
+      height: 'calc((100vw - 40px) / 16)',
+      minWidth: '20px', // 最小サイズを設定
+      maxWidth: '30px'  // 最大サイズを制限
     };
   };
   
