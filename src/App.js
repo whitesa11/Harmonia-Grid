@@ -505,7 +505,7 @@ const handleMouseOver = useCallback((row, col) => {
       <div 
         className={`${colors.gridBackground} rounded-lg shadow-lg p-1 mb-6 mx-auto`}
         style={{ 
-          width: '100%', 
+          width: 'fit-content', 
           overflow: 'hidden',
           maxWidth: '100%'
         }}
