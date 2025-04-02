@@ -81,9 +81,13 @@ const CalmComposer = () => {
     
     if (audioContextRef.current.state === 'suspended') {
       audioContextRef.current.resume().then(() => {
+        console.log('AudioContext resumed successfully');
         setAudioContextInitialized(true);
+      }).catch(err => {
+        console.error('Failed to resume AudioContext:', err);
       });
     } else {
+      console.log('AudioContext is already running');
       setAudioContextInitialized(true);
     }
   }, []);
@@ -479,13 +483,12 @@ const handleMouseOver = useCallback((row, col) => {
     };
   }, [handleTouchMove]);
   
-  // セルのスタイル
+  // セルのスタイル-固定
   const getCellStyle = () => {
     return {
-      width: 'calc((100vw - 40px) / 16)',  // 16列に分割
-      height: 'calc((100vw - 40px) / 16)',
-      minWidth: '20px', // 最小サイズを設定
-      maxWidth: '30px'  // 最大サイズを制限
+      width: '30px',
+      height: '30px',
+      minWidth: '30px',
     };
   };
   
