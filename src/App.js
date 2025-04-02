@@ -481,7 +481,18 @@ const CalmComposer = () => {
   
   return (
     <div 
+      style={{ 
+      position: 'fixed',
+      left: 0,
+      bottom: 0,
+      }}
+    > 
+    <div 
       className={`min-h-screen ${colors.background} flex flex-col items-center py-8 px-4 bg-gradient-to-r ${currentPattern.className}`}
+      style={{ 
+        height: '100%',
+        overflowY: 'auto' // 必要な場合のみ縦スクロールを許可
+      }}
       onMouseLeave={() => setIsMouseDown(false)}
     >
       <h1 className="text-3xl font-bold text-gray-800 mb-2">Harmonia Grid</h1>
@@ -491,9 +502,9 @@ const CalmComposer = () => {
       <div 
         className={`${colors.gridBackground} rounded-lg shadow-lg p-1 mb-6 mx-auto`}
         style={{ 
-          width: 'fit-content', 
+          width: '100%', 
           overflow: 'hidden',
-          maxWidth: '100%'
+          maxWidth: 'calc(100vw - 32px)'
         }}
       >
         <div className="grid-container">
@@ -667,6 +678,7 @@ const CalmComposer = () => {
         <p className="mt-1 sm:mt-2">リラックスするためのペンタトニックスケールを使用しているので、どの組み合わせも心地よく響きます。</p>
         <p className="mt-1 sm:mt-2">再生ボタンを押すと、左から右へと順番に音が鳴ります。保存ボタンでお気に入りの曲を保存することもできます。</p>
       </div>
+    </div>
     </div>
   );
 };
