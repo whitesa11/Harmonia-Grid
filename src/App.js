@@ -256,23 +256,23 @@ const CalmComposer = () => {
   };
   
   // マウスオーバーの処理（ドラッグ時）
-  const handleMouseOver = (row, col) => {
-    if (!isMouseDown || (lastCell.row === row && lastCell.col === col)) {
-      return;
-    }
-    
-    setLastCell({ row, col });
-    
-    const newGrid = [...grid];
-    // 追加モードか削除モードかに基づいてセルを更新
-    newGrid[row][col] = isAddMode;
-    setGrid(newGrid);
-    
-    // 追加モードのときのみ音を鳴らす
-    if (isAddMode && audioContextInitialized) {
-      playNote(row);
-    }
-  };
+const handleMouseOver = useCallback((row, col) => {
+  if (!isMouseDown || (lastCell.row === row && lastCell.col === col)) {
+    return;
+  }
+  
+  setLastCell({ row, col });
+  
+  const newGrid = [...grid];
+  // 追加モードか削除モードかに基づいてセルを更新
+  newGrid[row][col] = isAddMode;
+  setGrid(newGrid);
+  
+  // 追加モードのときのみ音を鳴らす
+  if (isAddMode && audioContextInitialized) {
+    playNote(row);
+  }
+}, [isMouseDown, lastCell.row, lastCell.col, isAddMode, grid, audioContextInitialized, playNote]);
   
   // グリッドをクリア
   const clearGrid = () => {
