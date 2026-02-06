@@ -248,8 +248,10 @@ useEffect(() => {
 
    // 横スクロール防止のためのeffect
    useEffect(() => {
+    document.documentElement.style.overflowX = 'hidden';
     document.body.style.overflowX = 'hidden';
     return () => {
+      document.documentElement.style.overflowX = '';
       document.body.style.overflowX = '';
     };
   }, []);
@@ -496,11 +498,14 @@ const loadComposition = (event) => {
   
   // タッチイベントの処理を改善
   const handleTouchStart = (e, row, col) => {
+    // グリッド上でのスクロールを防止
+    e.preventDefault();
+
     // AudioContextの初期化 - ユーザーインタラクション時に実行
     if (!audioContextInitialized) {
       initializeAudioContext();
     }
-    
+
     setIsMouseDown(true);
     setLastCell({ row, col });
     
@@ -522,26 +527,29 @@ const loadComposition = (event) => {
   // タッチムーブの処理を改善（パッシブイベントリスナーの問題を解決）
   const handleTouchMove = useCallback((e) => {
     if (!isMouseDown) return;
-    
+
+    // グリッド上でのスクロールを防止
+    e.preventDefault();
+
     // タッチイベントから座標を取得
     const touch = e.touches[0];
     const gridElement = document.querySelector('.grid-container');
     if (!gridElement) return;
-    
+
     const rect = gridElement.getBoundingClientRect();
-    
+
     // タッチ位置からグリッド上の位置を計算
     const touchX = touch.clientX - rect.left;
     const touchY = touch.clientY - rect.top;
-    
+
     // グリッドのセルサイズ（推定）
     const cellWidth = rect.width / gridSize.cols;
     const cellHeight = rect.height / gridSize.rows;
-    
+
     // タッチしたセルの計算
     const col = Math.floor(touchX / cellWidth);
     const row = Math.floor(touchY / cellHeight);
-    
+
     // グリッド範囲内かチェック
     if (row >= 0 && row < gridSize.rows && col >= 0 && col < gridSize.cols) {
       handleMouseOver(row, col);
@@ -567,7 +575,7 @@ const loadComposition = (event) => {
       handleTouchMove(e);
     };
     
-    gridContainer.addEventListener('touchmove', touchMoveHandler, { passive: true });
+    gridContainer.addEventListener('touchmove', touchMoveHandler, { passive: false });
     
     return () => {
       gridContainer.removeEventListener('touchmove', touchMoveHandler);
@@ -576,22 +584,19 @@ const loadComposition = (event) => {
 
     // セルのスタイル関数を更新して、レスポンシブ対応にする
     const getCellStyle = useCallback(() => {
-      // 画面サイズに応じてセルサイズを調整
-      let cellSize;
-      if (windowWidth < 375) {
-        cellSize = '25px'; // 小さいスマートフォン
-      } else if (windowWidth < 640) {
-        cellSize = '28px'; // 通常のスマートフォン
-      } else {
-        cellSize = '30px'; // タブレット以上
-    }
-    
+      // 画面幅からパディング(px-4 = 16px × 2)とグリッドのpadding(p-1 = 4px × 2)を引いた幅を使う
+      const availableWidth = windowWidth - 32 - 8;
+      // セルサイズ = 使える幅 / 列数（ボーダー分を考慮）
+      const calculatedSize = Math.floor(availableWidth / gridSize.cols) - 2;
+      // 最小20px、最大35pxに制限
+      const cellSize = Math.max(20, Math.min(35, calculatedSize));
+
     return {
-      width: cellSize,
-      height: cellSize,
-      minWidth: cellSize,
+      width: `${cellSize}px`,
+      height: `${cellSize}px`,
+      minWidth: `${cellSize}px`,
     };
-  }, [windowWidth]); // windowWidthが変わったときだけ再計算
+  }, [windowWidth, gridSize.cols]); // windowWidthまたは列数が変わったときに再計算
   
   return (
     <div 
